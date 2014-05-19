@@ -469,7 +469,7 @@ class MachineCom(object):
                             print "Next Layer Sent " + str(self.layerIndex)
                             for i in xrange(self.layerHistogram[self.layerIndex]):
                                 self._sendNext()
-                            self._transformFutureLayers()
+                           # self._transformFutureLayers()
                             self.layerIndex += 1
 
                         cmd = self._commandList[self._commandPos]
