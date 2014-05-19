@@ -168,9 +168,9 @@ class MachineCom(object):
 
         ### OUR EDITS
         
-        self.layerHistogram = {}
-        self.cumulLayerHistogram = {}
-        self.layerIndex = 0
+        self._layerHistogram = {}
+        self._cumulLayerHistogram = {}
+        self._layerIndex = 0
         self._commandPos = 0
         self._commandList = []
 
@@ -373,7 +373,7 @@ class MachineCom(object):
                     self._heatupWaitTimeLost = t - self._heatupWaitStartTime
                     self._heatupWaitStartTime = t
             elif line.strip() != '' and line.strip() != 'ok' and not line.startswith('Resend:') and line != 'echo:Unknown command:""\n' and self.isOperational():
-                print "Strange ??? " + line
+                print "Line Msg: " + line
                 self._callback.mcMessage(line)
 
             if self._state == self.STATE_DETECT_BAUDRATE:
@@ -452,25 +452,21 @@ class MachineCom(object):
                 print "line: " + line
                 if 'ok' in line:
                     timeout = time.time() + 5
-                    #if not self._commandQueue.empty():
-                        #print "_commandQueue NOT empty"
-                        #self._sendCommand(self._commandQueue.get())
+
 
                     ### OUR EDITS
                     print 'ok received'
-                    #print self.cumulLayerHistogram
                     #Test is command list is complate (+1 as pos starts at zero!)
                     if len(self._commandList) != (self._commandPos + 1):
-                        print "Commants in list: " + str(len(self._commandList) - self._commandPos)
-                        #print "Commands Left In Layer: " + str((self.cumulLayerHistogram[self.layerIndex] - self._commandPos))
-                        #if (self.cumulLayerHistogram[self.layerIndex] - self._commandPos) < 6 \
+                        print "Commands in list: " + str(len(self._commandList) - self._commandPos)
                         if (len(self._commandList) - self._commandPos) < 6 \
-                                and self.layerIndex in self.cumulLayerHistogram:
-                            print "Next Layer Sent " + str(self.layerIndex)
-                            for i in xrange(self.layerHistogram[self.layerIndex]):
+                                and self._layerIndex in self._cumulLayerHistogram:
+                            print "Next Layer Sent " + str(self._layerIndex)
+                            for i in xrange(self._layerHistogram[self._layerIndex]):
                                 self._sendNext()
-                           # self._transformFutureLayers()
-                            self.layerIndex += 1
+                           #### TEST BUFFER WORKS #####
+                           #self._transformFutureLayers()
+                            self._layerIndex += 1
 
                         cmd = self._commandList[self._commandPos]
                         self._sendCommand(cmd)
@@ -479,7 +475,7 @@ class MachineCom(object):
                     else:
                         print "Command List Empty set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
-                    ###
+                    
 
                 elif "resend" in line.lower() or "rs" in line:
                     try:
@@ -489,12 +485,9 @@ class MachineCom(object):
                             self._commandPos = int(line.split()[1])
 
                     print "Resend Request: " + str(self._commandPos)
-                    #self.layerIndex = 0
-                    #for i in range(len(self.cumulLayerHistogram)):
-                        #if(self._gcodePos <= self.cumulLayerHistogram[i]):
-                            #self.layerIndex = i
-                            #print "Layer Index Updated " + str(self.layerIndex)
-                            #break
+
+                    ###
+
 
         self._log("Connection closed, closing down monitor")
 
@@ -598,9 +591,9 @@ class MachineCom(object):
     
     def _sendNext(self):
         if self._gcodePos >= len(self._gcodeList):
+            ##### OUR EDITS 
             print "Outside of range return"
-            #print "Changing State To Operational"
-            #self._changeState(self.STATE_OPERATIONAL)
+            ######
             return
         if self._gcodePos == 100:
             self._printStartTime100 = time.time()
@@ -623,7 +616,6 @@ class MachineCom(object):
             self._log("Unexpected error: %s" % (getExceptionString()))
         checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._gcodePos, line)))
         ##### OUR EDITS #######
-        #self._sendCommand("N%d%s*%d" % (self._gcodePos, line, checksum))
         self.sendCommand("N%d%s*%d" % (self._gcodePos, line, checksum))
         ######################
         self._gcodePos += 1
@@ -631,13 +623,12 @@ class MachineCom(object):
     
     ### OUR EDITS
     def _transformFutureLayers(self):
-        nextLayer = self.layerIndex + 1
+        nextLayer = self._layerIndex + 1
         # Don't modify first five layers
-        if nextLayer < 5 or nextLayer > (len(self.cumulLayerHistogram)-2) :
+        if nextLayer < 5 or nextLayer > (len(self._cumulLayerHistogram)-2) :
             return
 
-        start = self.cumulLayerHistogram[self.layerIndex]
-        #end   = start + self._jlt_layerCountDict[nextLayer]
+        start = self._cumulLayerHistogram[self._layerIndex]
         end = len(self._gcodeList)-9
         print "Tranforming between lines " + str(start) + " and " + str(end)
         for i in range(start, end):
@@ -683,7 +674,6 @@ class MachineCom(object):
         cmd = cmd.encode('ascii', 'replace')
         if self.isPrinting():
             ##### OUR EDITS ########
-            #self._commandQueue.put(cmd)
             self._commandList.append(cmd)
             ##########
         elif self.isOperational():
@@ -698,19 +688,16 @@ class MachineCom(object):
         self._printSection = 'CUSTOM'
         self._changeState(self.STATE_PRINTING)
         self._printStartTime = time.time()
-        #for i in xrange(0, 4):
-        #    self._sendNext()
 
         ### OUR EDITS
         self._commandPos = 0
-        self.layerHistogram = layerHistogram
-        self.cumulLayerHistogram = self._cumulDict(layerHistogram)
+        self._layerHistogram = layerHistogram
+        self._cumulLayerHistogram = self._cumulDict(layerHistogram)
 
-        print self.cumulLayerHistogram
+        print self._cumulLayerHistogram
 
-        for i in range(self.layerHistogram[self.layerIndex]):
+        for i in range(self._layerHistogram[self._layerIndex]):
             self._sendNext()
-        #self.layerIndex += 1
 
         ###
 
