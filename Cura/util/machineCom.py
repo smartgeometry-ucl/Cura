@@ -171,6 +171,9 @@ class MachineCom(object):
         self.layerHistogram = {}
         self.cumulLayerHistogram = {}
         self.layerIndex = 0
+        self._commandPos = 0
+        self._commandList = []
+
         ###
 
         self._port = port
@@ -337,12 +340,15 @@ class MachineCom(object):
             timeout = time.time() + 5
         tempRequestTimeout = timeout
         while True:
+            print "While start"
             line = self._readline()
             if line is None:
+                print "line is None"
                 break
             
             #No matter the state, if we see an error, goto the error state and store the error for reference.
             if line.startswith('Error:'):
+                print "Line starts with error"
                 #Oh YEAH, consistency.
                 # Marlin reports an MIN/MAX temp error as "Error:x\n: Extruder switched off. MAXTEMP triggered !\n"
                 #    But a bed temp error is reported as "Error: Temperature heated bed switched off. MAXTEMP triggered !!"
@@ -356,6 +362,7 @@ class MachineCom(object):
                     self._errorValue = line[6:]
                     self._changeState(self.STATE_ERROR)
             if ' T:' in line or line.startswith('T:'):
+                print "Line starts with T"
                 self._temp[self._temperatureRequestExtruder] = float(re.search("[0-9\.]*", line.split('T:')[1]).group(0))
                 if ' B:' in line:
                     self._bedTemp = float(re.search("[0-9\.]*", line.split(' B:')[1]).group(0))
@@ -366,9 +373,11 @@ class MachineCom(object):
                     self._heatupWaitTimeLost = t - self._heatupWaitStartTime
                     self._heatupWaitStartTime = t
             elif line.strip() != '' and line.strip() != 'ok' and not line.startswith('Resend:') and line != 'echo:Unknown command:""\n' and self.isOperational():
+                print "Strange ??? " + line
                 self._callback.mcMessage(line)
 
             if self._state == self.STATE_DETECT_BAUDRATE:
+                print "Detecting Baudrate"
                 if line == '' or time.time() > timeout:
                     if len(self._baudrateDetectList) < 1:
                         self.close()
@@ -407,6 +416,7 @@ class MachineCom(object):
                 else:
                     self._testingBaudrate = False
             elif self._state == self.STATE_CONNECTING:
+                print "State Connecting"
                 if line == '':
                     self._sendCommand("M105")
                 elif 'ok' in line:
@@ -414,6 +424,8 @@ class MachineCom(object):
                 if time.time() > timeout:
                     self.close()
             elif self._state == self.STATE_OPERATIONAL:
+                print "State Operational"
+                
                 #Request the temperature on comm timeout (every 2 seconds) when we are not printing.
                 if line == '':
                     if self._extruderCount > 0:
@@ -423,51 +435,67 @@ class MachineCom(object):
                         self._sendCommand("M105")
                     tempRequestTimeout = time.time() + 5
             elif self._state == self.STATE_PRINTING:
+                print "State Printing"
                 if line == '' and time.time() > timeout:
+                    print "Communication timeout"
                     self._log("Communication timeout during printing, forcing a line")
                     line = 'ok'
                 #Even when printing request the temperature every 5 seconds.
                 if time.time() > tempRequestTimeout:
+                    print "Timeout"
                     if self._extruderCount > 0:
                         self._temperatureRequestExtruder = (self._temperatureRequestExtruder + 1) % self._extruderCount
                         self._sendCommand("M105 T%d" % (self._temperatureRequestExtruder))
                     else:
                         self._sendCommand("M105")
                     tempRequestTimeout = time.time() + 5
+                print "line: " + line
                 if 'ok' in line:
                     timeout = time.time() + 5
-                    if not self._commandQueue.empty():
-                        self._sendCommand(self._commandQueue.get())
+                    #if not self._commandQueue.empty():
+                        #print "_commandQueue NOT empty"
+                        #self._sendCommand(self._commandQueue.get())
 
                     ### OUR EDITS
+                    print 'ok received'
+                    #print self.cumulLayerHistogram
+                    #Test is command list is complate (+1 as pos starts at zero!)
+                    if len(self._commandList) != (self._commandPos + 1):
+                        print "Commants in list: " + str(len(self._commandList) - self._commandPos)
+                        #print "Commands Left In Layer: " + str((self.cumulLayerHistogram[self.layerIndex] - self._commandPos))
+                        #if (self.cumulLayerHistogram[self.layerIndex] - self._commandPos) < 6 \
+                        if (len(self._commandList) - self._commandPos) < 6 \
+                                and self.layerIndex in self.cumulLayerHistogram:
+                            print "Next Layer Sent " + str(self.layerIndex)
+                            for i in xrange(self.layerHistogram[self.layerIndex]):
+                                self._sendNext()
+                            self._transformFutureLayers()
+                            self.layerIndex += 1
 
-                    elif (self.cumulLayerHistogram[self.layerIndex] - self._gcodePos) < 6:
-                        print "Next Layer Sent " + str(self.layerIndex)
-                        for i in xrange(self.layerHistogram[self.layerIndex]):
-                            self._sendNext()
-
-                        self.layerIndex += 1
+                        cmd = self._commandList[self._commandPos]
+                        self._sendCommand(cmd)
+                        self._commandPos += 1
+                        print "Command Sent: " + cmd
                     else:
-                        print "Number of commands left in layer " + str(self.cumulLayerHistogram[self.layerIndex] - self._gcodePos)
-
+                        print "Command List Empty set to operational"
+                        self._changeState(self.STATE_OPERATIONAL)
                     ###
 
                 elif "resend" in line.lower() or "rs" in line:
                     try:
-                        self._gcodePos = int(line.replace("N:"," ").replace("N"," ").replace(":"," ").split()[-1])
+                        self._commandPos = int(line.replace("N:"," ").replace("N"," ").replace(":"," ").split()[-1])
                     except:
                         if "rs" in line:
-                            self._gcodePos = int(line.split()[1])
+                            self._commandPos = int(line.split()[1])
 
-                    print "Resend request " + str(self._gcodePos)
-                    self.layerIndex = 0
+                    print "Resend Request: " + str(self._commandPos)
+                    #self.layerIndex = 0
                     #for i in range(len(self.cumulLayerHistogram)):
                         #if(self._gcodePos <= self.cumulLayerHistogram[i]):
                             #self.layerIndex = i
                             #print "Layer Index Updated " + str(self.layerIndex)
                             #break
 
-                    
         self._log("Connection closed, closing down monitor")
 
     def _setBaudrate(self, baudrate):
@@ -570,7 +598,9 @@ class MachineCom(object):
     
     def _sendNext(self):
         if self._gcodePos >= len(self._gcodeList):
-            self._changeState(self.STATE_OPERATIONAL)
+            print "Outside of range return"
+            #print "Changing State To Operational"
+            #self._changeState(self.STATE_OPERATIONAL)
             return
         if self._gcodePos == 100:
             self._printStartTime100 = time.time()
@@ -592,24 +622,73 @@ class MachineCom(object):
         except:
             self._log("Unexpected error: %s" % (getExceptionString()))
         checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._gcodePos, line)))
-        self._sendCommand("N%d%s*%d" % (self._gcodePos, line, checksum))
+        ##### OUR EDITS #######
+        #self._sendCommand("N%d%s*%d" % (self._gcodePos, line, checksum))
+        self.sendCommand("N%d%s*%d" % (self._gcodePos, line, checksum))
+        ######################
         self._gcodePos += 1
         self._callback.mcProgress(self._gcodePos)
     
     ### OUR EDITS
-    def _transformNextLayer(self):
-        pass
+    def _transformFutureLayers(self):
+        nextLayer = self.layerIndex + 1
+        # Don't modify first five layers
+        if nextLayer < 5 or nextLayer > (len(self.cumulLayerHistogram)-2) :
+            return
+
+        start = self.cumulLayerHistogram[self.layerIndex]
+        #end   = start + self._jlt_layerCountDict[nextLayer]
+        end = len(self._gcodeList)-9
+        print "Tranforming between lines " + str(start) + " and " + str(end)
+        for i in range(start, end):
+            if type(self._gcodeList[i]) is tuple:
+                self._gcodeList[i] = (self._transformLine(self._gcodeList[i]), self._gcodeList[i][1])
+            else:
+                self._gcodeList[i] = self._transformLine(self._gcodeList[i])
+
+
+    def _transformLine(self, gcode_line):
+        # Proof of concept: random transform first
+        # So given N5951G1 F3000 X110.27  Y99.80   E127.95342*47
+        # Return   N5951G1 F3000 X+offset Y+offset E127.95342*47
+        x_regex = r'X([0-9\.]*)'
+        y_regex = r'Y([0-9\.]*)'
+        x_amount = 0
+        y_amount = 0
+
+        if type(gcode_line) is tuple:
+            print('Tuple gcode encountered: ' + gcode_line[1])
+            gcode_line = gcode_line[0]
+
+        self._log('Gcode to change ' + gcode_line)
+
+        x_match = re.match('.*' + x_regex, gcode_line)
+        y_match = re.match('.*' + y_regex, gcode_line)
+
+        if x_match is not None and y_match is not None:
+            x_amount = float(x_match.group(1)) + 0.05
+            y_amount = float(y_match.group(1)) + 0.05
+        else:
+            self._log('Failed to match')
+            return gcode_line
+
+        updated_x = re.sub(x_regex, 'X' + str(x_amount), gcode_line)
+        changed_line = re.sub(y_regex, 'Y' + str(y_amount), updated_x)
+
+        self._log('Gcode changed ' + changed_line)
+        return changed_line
     ###
 
-
-    #Command Queue is for commands input using the terminal
     def sendCommand(self, cmd):
         cmd = cmd.encode('ascii', 'replace')
         if self.isPrinting():
-            self._commandQueue.put(cmd)
+            ##### OUR EDITS ########
+            #self._commandQueue.put(cmd)
+            self._commandList.append(cmd)
+            ##########
         elif self.isOperational():
             self._sendCommand(cmd)
-    
+
     def printGCode(self, gcodeList, layerHistogram):
         if not self.isOperational() or self.isPrinting():
             return
@@ -623,16 +702,15 @@ class MachineCom(object):
         #    self._sendNext()
 
         ### OUR EDITS
-
+        self._commandPos = 0
         self.layerHistogram = layerHistogram
         self.cumulLayerHistogram = self._cumulDict(layerHistogram)
-        print self.layerHistogram
-        print self.cumulLayerHistogram
 
+        print self.cumulLayerHistogram
 
         for i in range(self.layerHistogram[self.layerIndex]):
             self._sendNext()
-        self.layerIndex += 1
+        #self.layerIndex += 1
 
         ###
 
