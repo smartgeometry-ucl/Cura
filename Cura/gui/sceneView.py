@@ -242,7 +242,6 @@ class SceneView(openglGui.glGuiPanel):
             #else:
                 #self.showSaveGCode()
             ############################
-        
         if button == 3:
             menu = wx.Menu()
             self.Bind(wx.EVT_MENU, lambda e: self.showPrintWindow(), menu.Append(-1, _("Print with USB")))

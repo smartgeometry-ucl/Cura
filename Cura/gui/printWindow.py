@@ -314,6 +314,25 @@ class printWindow(wx.Frame):
 
         nb.AddPage(self.termPanel, _("Term"))
 
+
+        ######## OUR EDITS ########
+
+        self.expertPanel = wx.Panel(nb)
+        sizer = wx.GridBagSizer(2, 2)
+        self.expertPanel.SetSizer(sizer)
+
+        f = wx.Font(8, wx.FONTFAMILY_MODERN, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False)
+
+        switchMeshButton = wx.Button(self.expertPanel, -1, 'Switch Meshes')
+
+        sizer.AddGrowableCol(0)
+        sizer.AddGrowableRow(0)
+
+        nb.AddPage(self.expertPanel, _("Expert"))
+
+
+        ###########################
+
         self.sizer.AddGrowableRow(6)
         self.sizer.AddGrowableCol(3)
 
