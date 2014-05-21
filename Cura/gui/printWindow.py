@@ -21,6 +21,14 @@ from Cura.util import gcodeInterpreter
 from Cura.util import resources
 from Cura.util import profile
 
+###### OUR EDITS #########
+import shutil
+#from Cura.util import meshLoader
+#from Cura.util import sliceEngine
+#from Cura.util import objectScene
+#import traceback
+#########################
+
 #The printProcessMonitor is used from the main GUI python process. This monitors the printing python process.
 # This class also handles starting of the 2nd process for printing and all communications with it.
 class printProcessMonitor():
@@ -31,6 +39,7 @@ class printProcessMonitor():
         self._callback = callback
         self._id = -1
 
+    # filename is a gcode file
     def loadFile(self, filename, id):
         if self.handle is None:
             if platform.system() == "Darwin" and hasattr(sys, 'frozen'):
@@ -49,6 +58,7 @@ class printProcessMonitor():
             self.thread = threading.Thread(target=self.Monitor)
             self.thread.start()
         else:
+            print "Sending to process"
             self.handle.stdin.write('LOAD:%s\n' % filename)
         self._id = id
 
@@ -132,9 +142,12 @@ class printWindow(wx.Frame):
         super(printWindow, self).__init__(None, -1, title=_("Printing"))
         
         ### OUR EDITS
-        
+
         self.layerHistogram = {}
-        
+        #self._editedScene = objectScene.Scene()
+        #self._slicer = sliceEngine.Slicer(self._updateSliceProgress)
+        #self._editedGcode = None
+        #self._editedGcodeFilename = None
         ###
 
         t = time.time()
@@ -314,7 +327,6 @@ class printWindow(wx.Frame):
 
         nb.AddPage(self.termPanel, _("Term"))
 
-
         ######## OUR EDITS ########
 
         self.expertPanel = wx.Panel(nb)
@@ -323,13 +335,14 @@ class printWindow(wx.Frame):
 
         f = wx.Font(8, wx.FONTFAMILY_MODERN, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False)
 
-        switchMeshButton = wx.Button(self.expertPanel, -1, 'Switch Meshes')
+        self.switchMeshButton = wx.Button(self.expertPanel, -1, 'Switch Meshes')
 
         sizer.AddGrowableCol(0)
         sizer.AddGrowableRow(0)
 
         nb.AddPage(self.expertPanel, _("Expert"))
 
+        self.switchMeshButton.Bind(wx.EVT_BUTTON, self.sliceAndMerge("/Users/JamesHennessey/Projects/Cura/meshes/edited_cube.stl"))
 
         ###########################
 
@@ -463,6 +476,12 @@ class printWindow(wx.Frame):
             for button in self.cam.buttons:
                 button.Enable(self.machineCom is None or not self.machineCom.isPrinting())
 
+        ### OUR EDITS ###
+        print "printButton.Enable(True)" 
+        self.printButton.Enable(True)
+        
+        ###
+
     def UpdateProgress(self):
         status = ""
         if self.gcode is None:
@@ -515,11 +534,16 @@ class printWindow(wx.Frame):
 
     def OnPrint(self, e):
         if self.machineCom is None or not self.machineCom.isOperational():
+            print "MachineCom is None or not operational"
             return
         if self.gcodeList is None:
+            print "MachineCom GCodeList is None"
             return
         if self.machineCom.isPrinting():
+            print "MachineCom is printing"
+            self.machineCom.switchGCode(self.gcodeList, self.layerHistogram)
             return
+        print "MachineCom is NOT printing"
         self.currentZ = -1
         if self.cam is not None and self.timelapsEnable.GetValue():
             self.cam.startTimelapse(self.timelapsSavePath.GetValue())
@@ -607,9 +631,13 @@ class printWindow(wx.Frame):
             self.Layout()
 
     def LoadGCodeFile(self, filename):
+        shutil.copyfile(filename, "/Users/JamesHennessey/Projects/Cura/gcode/tmp/" + str(time.time()) + ".gcode")
         if self.machineCom is not None and self.machineCom.isPrinting():
-            return False
-
+            print "filename " + filename + " won't be printed again"
+            #return False
+            gcodeList = []
+        else:
+            gcodeList = ["M110"]
         ### OUR EDITS
         
         layerIndex = 0
@@ -619,7 +647,6 @@ class printWindow(wx.Frame):
 
         #Send an initial M110 to reset the line counter to zero.
         prevLineType = lineType = 'CUSTOM'
-        gcodeList = ["M110"]
         for line in open(filename, 'r'):
 
             ### OUR EDITS
@@ -722,6 +749,35 @@ class printWindow(wx.Frame):
         if self.cam is not None:
             wx.CallAfter(self.cam.takeNewImage)
             wx.CallAfter(self.camPreview.Refresh)
+
+    ###### OUR EDITS ###############
+
+    def sliceAndMerge(self, filename):
+        pass
+        #try:
+            #objList = meshLoader.loadMeshes(filename)
+        #except:
+            #traceback.print_exc()
+        #else:
+            #for obj in objList:
+                ##if self._objectLoadShader is not None:
+                    ##obj._loadAnim = openglGui.animation(self, 1, 0, 1.5)
+                ##else:
+                    ##obj._loadAnim = None
+                #self._scene.add(obj)
+                #self._scene.centerAll()
+                #self._selectObject(obj)
+                ##if obj.getScale()[0] < 1.0:
+                    ##self.notification.message("Warning: Object scaled down.")
+
+        #self._slicer.runSlicer(self._scene)
+        #self._editedGcode = gcodeInterpreter.gcode()
+        #self._editedGcodeFilename = self._slicer.getGCodeFilename()
+
+    def _updateSliceProgress(self, progressValue, ready):
+        pass
+
+    ################################
 
 
 class temperatureGraph(wx.Panel):

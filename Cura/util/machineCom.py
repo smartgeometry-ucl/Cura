@@ -340,7 +340,8 @@ class MachineCom(object):
             timeout = time.time() + 5
         tempRequestTimeout = timeout
         while True:
-            print "While start"
+            print "cumul hist size:   " + str(len(self._cumulLayerHistogram))
+            print "command list size: " + str(len(self._commandList))
             line = self._readline()
             if line is None:
                 print "line is None"
@@ -362,7 +363,6 @@ class MachineCom(object):
                     self._errorValue = line[6:]
                     self._changeState(self.STATE_ERROR)
             if ' T:' in line or line.startswith('T:'):
-                print "Line starts with T"
                 self._temp[self._temperatureRequestExtruder] = float(re.search("[0-9\.]*", line.split('T:')[1]).group(0))
                 if ' B:' in line:
                     self._bedTemp = float(re.search("[0-9\.]*", line.split(' B:')[1]).group(0))
@@ -377,7 +377,6 @@ class MachineCom(object):
                 self._callback.mcMessage(line)
 
             if self._state == self.STATE_DETECT_BAUDRATE:
-                print "Detecting Baudrate"
                 if line == '' or time.time() > timeout:
                     if len(self._baudrateDetectList) < 1:
                         self.close()
@@ -416,7 +415,6 @@ class MachineCom(object):
                 else:
                     self._testingBaudrate = False
             elif self._state == self.STATE_CONNECTING:
-                print "State Connecting"
                 if line == '':
                     self._sendCommand("M105")
                 elif 'ok' in line:
@@ -424,8 +422,6 @@ class MachineCom(object):
                 if time.time() > timeout:
                     self.close()
             elif self._state == self.STATE_OPERATIONAL:
-                print "State Operational"
-                
                 #Request the temperature on comm timeout (every 2 seconds) when we are not printing.
                 if line == '':
                     if self._extruderCount > 0:
@@ -449,13 +445,11 @@ class MachineCom(object):
                     else:
                         self._sendCommand("M105")
                     tempRequestTimeout = time.time() + 5
-                print "line: " + line
                 if 'ok' in line:
                     timeout = time.time() + 5
 
 
                     ### OUR EDITS
-                    print 'ok received'
                     #Test is command list is complate (+1 as pos starts at zero!)
                     if len(self._commandList) != (self._commandPos + 1):
                         print "Commands in list: " + str(len(self._commandList) - self._commandPos)
@@ -471,7 +465,6 @@ class MachineCom(object):
                         cmd = self._commandList[self._commandPos]
                         self._sendCommand(cmd)
                         self._commandPos += 1
-                        print "Command Sent: " + cmd
                     else:
                         print "Command List Empty set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
@@ -699,6 +692,14 @@ class MachineCom(object):
         for i in range(self._layerHistogram[self._layerIndex]):
             self._sendNext()
 
+    def switchGCode(self, gcodeList, layerHistogram):
+        print "Switch GCode called"
+        self._gcodeList = gcodeList
+        self._layerHistogram = layerHistogram
+        self._cumulLayerHistogram = self._cumulDict(layerHistogram)
+
+        print self._cumulLayerHistogram
+    
         ###
 
     ### OUR EDITS

@@ -222,25 +222,26 @@ class SceneView(openglGui.glGuiPanel):
     def OnPrintButton(self, button):
         if button == 1:
             ##### OUR EDITS ############
-            self.showPrintWindow()
+            #self.showPrintWindow()
 
-            #if machineCom.machineIsConnected():
-                #self.showPrintWindow()
-            #elif len(removableStorage.getPossibleSDcardDrives()) > 0:
-                #drives = removableStorage.getPossibleSDcardDrives()
-                #if len(drives) > 1:
-                    #dlg = wx.SingleChoiceDialog(self, "Select SD drive", "Multiple removable drives have been found,\nplease select your SD card drive", map(lambda n: n[0], drives))
-                    #if dlg.ShowModal() != wx.ID_OK:
-                        #dlg.Destroy()
-                        #return
-                    #drive = drives[dlg.GetSelection()]
-                    #dlg.Destroy()
-                #else:
-                    #drive = drives[0]
-                #filename = self._scene._objectList[0].getName() + '.gcode'
-                #threading.Thread(target=self._copyFile,args=(self._gcodeFilename, drive[1] + filename, drive[1])).start()
-            #else:
-                #self.showSaveGCode()
+            if machineCom.machineIsConnected():
+                print self._usbPrintMonitor.getState()
+                self.showPrintWindow()
+            elif len(removableStorage.getPossibleSDcardDrives()) > 0:
+                drives = removableStorage.getPossibleSDcardDrives()
+                if len(drives) > 1:
+                    dlg = wx.SingleChoiceDialog(self, "Select SD drive", "Multiple removable drives have been found,\nplease select your SD card drive", map(lambda n: n[0], drives))
+                    if dlg.ShowModal() != wx.ID_OK:
+                        dlg.Destroy()
+                        return
+                    drive = drives[dlg.GetSelection()]
+                    dlg.Destroy()
+                else:
+                    drive = drives[0]
+                filename = self._scene._objectList[0].getName() + '.gcode'
+                threading.Thread(target=self._copyFile,args=(self._gcodeFilename, drive[1] + filename, drive[1])).start()
+            else:
+                self.showSaveGCode()
             ############################
         if button == 3:
             menu = wx.Menu()
@@ -251,6 +252,8 @@ class SceneView(openglGui.glGuiPanel):
             menu.Destroy()
 
     def showPrintWindow(self):
+        print "Show Print Window"
+        print self._gcodeFilename
         if self._gcodeFilename is None:
             return
         self._usbPrintMonitor.loadFile(self._gcodeFilename, self._slicer.getID())
