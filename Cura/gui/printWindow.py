@@ -342,7 +342,7 @@ class printWindow(wx.Frame):
 
         nb.AddPage(self.expertPanel, _("Expert"))
 
-        self.switchMeshButton.Bind(wx.EVT_BUTTON, self.sliceAndMerge("/Users/JamesHennessey/Projects/Cura/meshes/edited_cube.stl"))
+        #self.switchMeshButton.Bind(wx.EVT_BUTTON, self.sliceAndMerge("/Users/JamesHennessey/Projects/Cura/meshes/edited_cube.stl"))
 
         ###########################
 
@@ -391,6 +391,9 @@ class printWindow(wx.Frame):
             if line.startswith('LOAD:'):
                 if not self.LoadGCodeFile(line[5:]):
                     print 'LOADFAILED\n'
+                elif self.machineCom.isPrinting():
+                    print "LoadGCode Success, MachineCom is printing so switchingGcode at next layer"
+                    self.machineCom.switchGCode(self.gcodeList, self.layerHistogram)
 
     def _webcamCheck(self):
         self.cam = webcam.webcam()
@@ -477,8 +480,8 @@ class printWindow(wx.Frame):
                 button.Enable(self.machineCom is None or not self.machineCom.isPrinting())
 
         ### OUR EDITS ###
-        print "printButton.Enable(True)" 
-        self.printButton.Enable(True)
+        #print "printButton.Enable(True)" 
+        #self.printButton.Enable(True)
         
         ###
 
@@ -541,7 +544,7 @@ class printWindow(wx.Frame):
             return
         if self.machineCom.isPrinting():
             print "MachineCom is printing"
-            self.machineCom.switchGCode(self.gcodeList, self.layerHistogram)
+            #self.machineCom.switchGCode(self.gcodeList, self.layerHistogram)
             return
         print "MachineCom is NOT printing"
         self.currentZ = -1
@@ -749,35 +752,6 @@ class printWindow(wx.Frame):
         if self.cam is not None:
             wx.CallAfter(self.cam.takeNewImage)
             wx.CallAfter(self.camPreview.Refresh)
-
-    ###### OUR EDITS ###############
-
-    def sliceAndMerge(self, filename):
-        pass
-        #try:
-            #objList = meshLoader.loadMeshes(filename)
-        #except:
-            #traceback.print_exc()
-        #else:
-            #for obj in objList:
-                ##if self._objectLoadShader is not None:
-                    ##obj._loadAnim = openglGui.animation(self, 1, 0, 1.5)
-                ##else:
-                    ##obj._loadAnim = None
-                #self._scene.add(obj)
-                #self._scene.centerAll()
-                #self._selectObject(obj)
-                ##if obj.getScale()[0] < 1.0:
-                    ##self.notification.message("Warning: Object scaled down.")
-
-        #self._slicer.runSlicer(self._scene)
-        #self._editedGcode = gcodeInterpreter.gcode()
-        #self._editedGcodeFilename = self._slicer.getGCodeFilename()
-
-    def _updateSliceProgress(self, progressValue, ready):
-        pass
-
-    ################################
 
 
 class temperatureGraph(wx.Panel):

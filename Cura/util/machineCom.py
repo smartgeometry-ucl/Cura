@@ -342,6 +342,8 @@ class MachineCom(object):
         while True:
             print "cumul hist size:   " + str(len(self._cumulLayerHistogram))
             print "command list size: " + str(len(self._commandList))
+            if not self._gcodeList is None:
+                print "gcode list size:   " + str(len(self._gcodeList))
             line = self._readline()
             if line is None:
                 print "line is None"
@@ -458,13 +460,22 @@ class MachineCom(object):
                             print "Next Layer Sent " + str(self._layerIndex)
                             for i in xrange(self._layerHistogram[self._layerIndex]):
                                 self._sendNext()
-                           #### TEST BUFFER WORKS #####
-                           #self._transformFutureLayers()
+                            #### TEST BUFFER WORKS #####
+                            #self._transformFutureLayers()
                             self._layerIndex += 1
 
                         cmd = self._commandList[self._commandPos]
                         self._sendCommand(cmd)
                         self._commandPos += 1
+                    elif len(self._gcodeList) <= len(self._commandList):
+                        print "Command List bigger than gcode list set to operational"
+                        self._changeState(self.STATE_OPERATIONAL)
+
+                    elif len(self._gcodeList) != len(self._commandList):
+                        diff = len(self._gcodeList) - len(self._commandList)
+                        for i in xrange(diff):
+                            self._sendNext()
+
                     else:
                         print "Command List Empty set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
@@ -566,6 +577,7 @@ class MachineCom(object):
             except:
                 pass
         self._log('Send: %s' % (cmd))
+        print "Sent: " + cmd
         try:
             self._serial.write(cmd + '\n')
         except serial.SerialTimeoutException:
@@ -699,6 +711,9 @@ class MachineCom(object):
         self._cumulLayerHistogram = self._cumulDict(layerHistogram)
 
         print self._cumulLayerHistogram
+
+        #for cmd in gcodeList:
+            #print cmd
     
         ###
 
