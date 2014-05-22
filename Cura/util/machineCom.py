@@ -173,6 +173,8 @@ class MachineCom(object):
         self._layerIndex = 0
         self._commandPos = 0
         self._commandList = []
+        self._seenZ = 0
+        self._fakeGcodePos = 0
 
         ###
 
@@ -340,10 +342,10 @@ class MachineCom(object):
             timeout = time.time() + 5
         tempRequestTimeout = timeout
         while True:
-            print "cumul hist size:   " + str(len(self._cumulLayerHistogram))
-            print "command list size: " + str(len(self._commandList))
-            if not self._gcodeList is None:
-                print "gcode list size:   " + str(len(self._gcodeList))
+            #print "cumul hist size:   " + str(len(self._cumulLayerHistogram))
+            #print "command list size: " + str(len(self._commandList))
+            #if not self._gcodeList is None:
+                #print "gcode list size:   " + str(len(self._gcodeList))
             line = self._readline()
             if line is None:
                 print "line is None"
@@ -433,7 +435,6 @@ class MachineCom(object):
                         self._sendCommand("M105")
                     tempRequestTimeout = time.time() + 5
             elif self._state == self.STATE_PRINTING:
-                print "State Printing"
                 if line == '' and time.time() > timeout:
                     print "Communication timeout"
                     self._log("Communication timeout during printing, forcing a line")
@@ -454,10 +455,11 @@ class MachineCom(object):
                     ### OUR EDITS
                     #Test is command list is complate (+1 as pos starts at zero!)
                     if len(self._commandList) != (self._commandPos + 1):
-                        print "Commands in list: " + str(len(self._commandList) - self._commandPos)
+                        #print "Commands in list: " + str(len(self._commandList) - self._commandPos)
                         if (len(self._commandList) - self._commandPos) < 6 \
                                 and self._layerIndex in self._cumulLayerHistogram:
-                            print "Next Layer Sent " + str(self._layerIndex)
+                            print "Sending layer just to command list: " + str(self._layerIndex)
+
                             for i in xrange(self._layerHistogram[self._layerIndex]):
                                 self._sendNext()
                             #### TEST BUFFER WORKS #####
@@ -479,7 +481,6 @@ class MachineCom(object):
                     else:
                         print "Command List Empty set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
-                    
 
                 elif "resend" in line.lower() or "rs" in line:
                     try:
@@ -577,7 +578,7 @@ class MachineCom(object):
             except:
                 pass
         self._log('Send: %s' % (cmd))
-        print "Sent: " + cmd
+        #print "Sent: " + cmd
         try:
             self._serial.write(cmd + '\n')
         except serial.SerialTimeoutException:
@@ -614,6 +615,7 @@ class MachineCom(object):
                 line = re.sub('F([0-9]*)', lambda m: 'F' + str(int(int(m.group(1)) * self._feedRateModifier[self._printSection])), line)
             if ('G0' in line or 'G1' in line) and 'Z' in line:
                 z = float(re.search('Z([0-9\.]*)', line).group(1))
+                print "Z seen: " + str(self._seenZ) + " their Z: " + str(self._currentZ)
                 if self._currentZ != z:
                     self._currentZ = z
                     self._callback.mcZChange(z)
@@ -621,9 +623,23 @@ class MachineCom(object):
             self._log("Unexpected error: %s" % (getExceptionString()))
         checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._gcodePos, line)))
         ##### OUR EDITS #######
-        self.sendCommand("N%d%s*%d" % (self._gcodePos, line, checksum))
+        print "About to send: " + str(self._fakeGcodePos) + " " + line
+        self.sendCommand("N%d%s*%d" % (self._fakeGcodePos, line, checksum))
+        self._fakeGcodePos += 1
+        if 'Z' in line:
+            
+            z_regex = r'Z([0-9\.]+)'
+            z_amount = 0
+
+            z_match = re.match('.*' + z_regex, line)
+
+            if z_match is not None:
+                z_amount = float(z_match.group(1))
+                self._seenZ = z_amount
+
         ######################
         self._gcodePos += 1
+        print "GcodePos: " + str(self._gcodePos)
         self._callback.mcProgress(self._gcodePos)
     
     ### OUR EDITS
@@ -697,23 +713,39 @@ class MachineCom(object):
         ### OUR EDITS
         self._commandPos = 0
         self._layerHistogram = layerHistogram
-        self._cumulLayerHistogram = self._cumulDict(layerHistogram)
+        self._cumulLayerHistogram = layerHistogram #self._cumulDict(layerHistogram)
 
+        print self._layerHistogram
         print self._cumulLayerHistogram
 
         for i in range(self._layerHistogram[self._layerIndex]):
             self._sendNext()
 
     def switchGCode(self, gcodeList, layerHistogram):
-        print "Switch GCode called"
+        print "Switch GCode called at layer " + str(self._layerIndex)
         self._gcodeList = gcodeList
         self._layerHistogram = layerHistogram
-        self._cumulLayerHistogram = self._cumulDict(layerHistogram)
+        self._cumulLayerHistogram = layerHistogram #self._cumulDict(layerHistogram)
 
+        #self._gcodePos = self._cumulLayerHistogram[self._layerIndex]
+        print self._layerHistogram
         print self._cumulLayerHistogram
 
-        #for cmd in gcodeList:
-            #print cmd
+        newLayerIndex = 0
+        z_regex = r'Z([0-9\.]+)'
+        z_amount = -2
+
+        print "Hello banana"
+        for cmd in self._gcodeList:
+            sys.std.write('Q ')
+            z_match = float(re.match('.*' + z_regex, cmd))
+
+            if z_match is not None and z_match < self._seenZ + 0.10:
+                sys.std.write('Z:' + str(z_match))
+                z_amount += 1
+
+        print "\nZ Amount: " + str(z_amount)
+        self._layerIndex = z_amount
     
         ###
 

@@ -115,6 +115,12 @@ class SceneView(openglGui.glGuiPanel):
         self.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheel)
         self.Bind(wx.EVT_LEAVE_WINDOW, self.OnMouseLeave)
 
+
+        ###### OUR EDITS #####
+        self.reSendButton         = openglGui.glButton(self, 5, _("Re-Send"), (3,0), self.OnRePrintButton)
+        self.reSendButton.setDisabled(True)
+        #####################
+
         self.OnViewChange()
         self.OnToolSelect(0)
         self.updateToolButtons()
@@ -227,6 +233,7 @@ class SceneView(openglGui.glGuiPanel):
             if machineCom.machineIsConnected():
                 print self._usbPrintMonitor.getState()
                 self.showPrintWindow()
+                self.reSendButton.setDisabled(False)
             elif len(removableStorage.getPossibleSDcardDrives()) > 0:
                 drives = removableStorage.getPossibleSDcardDrives()
                 if len(drives) > 1:
@@ -250,6 +257,19 @@ class SceneView(openglGui.glGuiPanel):
             self.Bind(wx.EVT_MENU, lambda e: self._showSliceLog(), menu.Append(-1, _("Slice engine log...")))
             self.PopupMenu(menu)
             menu.Destroy()
+
+    
+    ############ OUR EDITS ################
+    def OnRePrintButton(self, button):
+        if button == 1:
+            print "RePrint"
+            print self._gcodeFilename
+            if self._gcodeFilename is None:
+                return
+            self._usbPrintMonitor.loadFile(self._gcodeFilename, self._slicer.getID())
+
+
+    ######################################
 
     def showPrintWindow(self):
         print "Show Print Window"

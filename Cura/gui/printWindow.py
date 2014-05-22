@@ -643,6 +643,7 @@ class printWindow(wx.Frame):
             gcodeList = ["M110"]
         ### OUR EDITS
         
+        self.layerHistogram = {}
         layerIndex = 0
         self.layerHistogram[layerIndex] = 1
 
@@ -684,6 +685,8 @@ class printWindow(wx.Frame):
         self.filename = filename
         self.gcode = gcode
         self.gcodeList = gcodeList
+
+        print "Gcode List len: " + str(len(self.gcodeList))
 
         wx.CallAfter(self.progress.SetRange, len(gcodeList))
         wx.CallAfter(self.UpdateButtonStates)
