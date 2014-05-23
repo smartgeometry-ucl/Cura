@@ -472,6 +472,16 @@ class MachineCom(object):
                     elif len(self._gcodeList) <= len(self._commandList):
                         print "Command List bigger than gcode list set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
+                        
+                        for cmd in self._commandList:
+                            print "CMD List: " + cmd
+
+                        for cmd in self._gcodeList:
+                            if type(cmd) is str:
+                                print "Gcode List: " + cmd
+                            else:
+                                print "Gcode List: " + cmd[0]
+
 
                     elif len(self._gcodeList) != len(self._commandList):
                         diff = len(self._gcodeList) - len(self._commandList)
@@ -481,6 +491,8 @@ class MachineCom(object):
                     else:
                         print "Command List Empty set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
+                        for cmd in self._commandList:
+                            print cmd
 
                 elif "resend" in line.lower() or "rs" in line:
                     try:
@@ -594,7 +606,7 @@ class MachineCom(object):
             self._log("Unexpected error while writing serial port: %s" % (getExceptionString()))
             self._errorValue = getExceptionString()
             self.close(True)
-    
+
     def _sendNext(self):
         if self._gcodePos >= len(self._gcodeList):
             ##### OUR EDITS 
@@ -615,15 +627,15 @@ class MachineCom(object):
                 line = re.sub('F([0-9]*)', lambda m: 'F' + str(int(int(m.group(1)) * self._feedRateModifier[self._printSection])), line)
             if ('G0' in line or 'G1' in line) and 'Z' in line:
                 z = float(re.search('Z([0-9\.]*)', line).group(1))
-                print "Z seen: " + str(self._seenZ) + " their Z: " + str(self._currentZ)
+                #print "Z seen: " + str(self._seenZ) + " their Z: " + str(self._currentZ)
                 if self._currentZ != z:
                     self._currentZ = z
                     self._callback.mcZChange(z)
         except:
             self._log("Unexpected error: %s" % (getExceptionString()))
-        checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._gcodePos, line)))
+        checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._fakeGcodePos, line)))
         ##### OUR EDITS #######
-        print "About to send: " + str(self._fakeGcodePos) + " " + line
+        #print "About to send: " + str(self._fakeGcodePos) + " " + line
         self.sendCommand("N%d%s*%d" % (self._fakeGcodePos, line, checksum))
         self._fakeGcodePos += 1
         if 'Z' in line:
@@ -639,7 +651,7 @@ class MachineCom(object):
 
         ######################
         self._gcodePos += 1
-        print "GcodePos: " + str(self._gcodePos)
+        #print "GcodePos: " + str(self._gcodePos)
         self._callback.mcProgress(self._gcodePos)
     
     ### OUR EDITS
@@ -725,27 +737,38 @@ class MachineCom(object):
         print "Switch GCode called at layer " + str(self._layerIndex)
         self._gcodeList = gcodeList
         self._layerHistogram = layerHistogram
-        self._cumulLayerHistogram = layerHistogram #self._cumulDict(layerHistogram)
+        self._cumulLayerHistogram = self._cumulDict(layerHistogram)
 
-        #self._gcodePos = self._cumulLayerHistogram[self._layerIndex]
         print self._layerHistogram
         print self._cumulLayerHistogram
 
-        newLayerIndex = 0
-        z_regex = r'Z([0-9\.]+)'
-        z_amount = -2
 
-        print "Hello banana"
-        for cmd in self._gcodeList:
-            sys.std.write('Q ')
-            z_match = float(re.match('.*' + z_regex, cmd))
+        self._gcodePos = self._cumulLayerHistogram[self._layerIndex - 1]
 
-            if z_match is not None and z_match < self._seenZ + 0.10:
-                sys.std.write('Z:' + str(z_match))
-                z_amount += 1
+        #newLayerIndex = 0
+        #z_regex = r'Z([0-9\.]+)'
+        #z_amount = -2
 
-        print "\nZ Amount: " + str(z_amount)
-        self._layerIndex = z_amount
+        #print "Hello banana"
+        #print "Length of _gcodeList " + str(len(self._gcodeList))
+        #for cmd in self._gcodeList:
+            #print "Hello"
+            #print type(cmd)
+            #print cmd
+            #if type(cmd) is str:
+                #z_match = re.match('.*' + z_regex, cmd)
+            #else:
+                #z_match = re.match('.*' + z_regex, cmd[0])
+
+
+            #if z_match is not None:
+                #z = float(z_match.group(1))
+                #print('Z:' + str(z))
+                #if z < (self._seenZ + 0.10):
+                    #z_amount += 1
+
+        #print "\nZ Amount: " + str(z_amount)
+        #self._layerIndex = z_amount
     
         ###
 
