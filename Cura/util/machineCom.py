@@ -175,6 +175,10 @@ class MachineCom(object):
         self._commandList = []
         self._seenZ = 0
         self._fakeGcodePos = 0
+        self._printDetails = []
+        self._currentGcodeFile = 0
+        self._runningE = 0
+        self._previousE = 0
 
         ###
 
@@ -458,8 +462,8 @@ class MachineCom(object):
                         #print "Commands in list: " + str(len(self._commandList) - self._commandPos)
                         if (len(self._commandList) - self._commandPos) < 6 \
                                 and self._layerIndex in self._cumulLayerHistogram:
-                            print "Sending layer just to command list: " + str(self._layerIndex)
-
+                            print "Sending layer sent to command list: " + str(self._layerIndex)
+                            self._printDetails.append(";LAYER:%d F%d" % (self._layerIndex, self._currentGcodeFile))
                             for i in xrange(self._layerHistogram[self._layerIndex]):
                                 self._sendNext()
                             #### TEST BUFFER WORKS #####
@@ -472,16 +476,7 @@ class MachineCom(object):
                     elif len(self._gcodeList) <= len(self._commandList):
                         print "Command List bigger than gcode list set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
-                        
-                        for cmd in self._commandList:
-                            print "CMD List: " + cmd
-
-                        for cmd in self._gcodeList:
-                            if type(cmd) is str:
-                                print "Gcode List: " + cmd
-                            else:
-                                print "Gcode List: " + cmd[0]
-
+                        self._writePrintDetails();
 
                     elif len(self._gcodeList) != len(self._commandList):
                         diff = len(self._gcodeList) - len(self._commandList)
@@ -610,7 +605,7 @@ class MachineCom(object):
     def _sendNext(self):
         if self._gcodePos >= len(self._gcodeList):
             ##### OUR EDITS 
-            print "Outside of range return"
+            print "Sending end of commands " + str(len(self._gcodeList) - self._gcodePos)
             ######
             return
         if self._gcodePos == 100:
@@ -633,11 +628,33 @@ class MachineCom(object):
                     self._callback.mcZChange(z)
         except:
             self._log("Unexpected error: %s" % (getExceptionString()))
-        checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._fakeGcodePos, line)))
+        
         ##### OUR EDITS #######
+
+        if 'E' in line:
+            print 'There is an E in the line'
+
+            e_regex = r'E([0-9\.]+)'
+            e_amount = 0
+
+            e_match = re.match('.*' + e_regex, line)
+
+            if e_match is not None:
+                e_amount = float(e_match.group(1))
+                self._runningE += e_amount - self._previousE
+                print ('e_amount: ' + str(e_amount) + " currentE: " + str(self._runningE) + " previousE: " + str(self._previousE) 
+                        + " file " + str(self._currentGcodeFile))
+                line = line.replace('E' + str(e_amount), 'E' + str(self._runningE))
+                self._previousE = e_amount
+            else:
+                print 'E not matched: ' + line
+
+        checksum = reduce(lambda x,y:x^y, map(ord, "N%d%s" % (self._fakeGcodePos, line)))
         #print "About to send: " + str(self._fakeGcodePos) + " " + line
+
         self.sendCommand("N%d%s*%d" % (self._fakeGcodePos, line, checksum))
         self._fakeGcodePos += 1
+        self._printDetails.append("%s F%d" % (line, self._currentGcodeFile))
         if 'Z' in line:
             
             z_regex = r'Z([0-9\.]+)'
@@ -723,15 +740,19 @@ class MachineCom(object):
         self._printStartTime = time.time()
 
         ### OUR EDITS
+        self._currentGcodeFile = 1
         self._commandPos = 0
         self._layerHistogram = layerHistogram
         self._cumulLayerHistogram = layerHistogram #self._cumulDict(layerHistogram)
 
         print self._layerHistogram
         print self._cumulLayerHistogram
-
+        self._printDetails = []
+        self._printDetails.append(";LAYER:%d F%d" % (self._layerIndex, self._currentGcodeFile))
         for i in range(self._layerHistogram[self._layerIndex]):
             self._sendNext()
+
+        self._layerIndex += 1
 
     def switchGCode(self, gcodeList, layerHistogram):
         print "Switch GCode called at layer " + str(self._layerIndex)
@@ -742,35 +763,40 @@ class MachineCom(object):
         print self._layerHistogram
         print self._cumulLayerHistogram
 
+        self._gcodePos = self._cumulLayerHistogram[self._layerIndex - 1] - 1
+        self._currentGcodeFile += 1
 
-        self._gcodePos = self._cumulLayerHistogram[self._layerIndex - 1]
+        line_range = range(self._gcodePos)
+        line_range.reverse()
+        for i in line_range:
+            
+            line = self._gcodeList[i]
 
-        #newLayerIndex = 0
-        #z_regex = r'Z([0-9\.]+)'
-        #z_amount = -2
+            if 'E' in line:
+                e_regex = r'E([0-9\.]+)'
+                e_amount = 0
 
-        #print "Hello banana"
-        #print "Length of _gcodeList " + str(len(self._gcodeList))
-        #for cmd in self._gcodeList:
-            #print "Hello"
-            #print type(cmd)
-            #print cmd
-            #if type(cmd) is str:
-                #z_match = re.match('.*' + z_regex, cmd)
-            #else:
-                #z_match = re.match('.*' + z_regex, cmd[0])
+                e_match = re.match('.*' + e_regex, line)
 
+                if e_match is not None:
+                    e_amount = float(e_match.group(1))
+                    self._previousE = e_amount
+                    print "###### previousE " + str(self._previousE) + " e_amount " + str(e_amount)
+                    return
 
-            #if z_match is not None:
-                #z = float(z_match.group(1))
-                #print('Z:' + str(z))
-                #if z < (self._seenZ + 0.10):
-                    #z_amount += 1
+        print 'No E found'
 
-        #print "\nZ Amount: " + str(z_amount)
-        #self._layerIndex = z_amount
-    
         ###
+
+    #### OUR EDITS ####
+
+    def _writePrintDetails(self):
+        with open("/Users/JamesHennessey/Projects/Cura/print_info/" + str(time.time()) + ".txt", 'w') as f:
+            for s in self._printDetails:
+                f.write(s + '\n')
+
+    ##################
+
 
     ### OUR EDITS
     def _cumulDict(self, d):
