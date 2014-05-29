@@ -31,3 +31,4 @@ scripts/win32/dist/*
 log.txt
 output.txt
 *.bak
+print_info/

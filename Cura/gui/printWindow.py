@@ -142,12 +142,9 @@ class printWindow(wx.Frame):
         super(printWindow, self).__init__(None, -1, title=_("Printing"))
         
         ### OUR EDITS
-
         self.layerHistogram = {}
-        #self._editedScene = objectScene.Scene()
-        #self._slicer = sliceEngine.Slicer(self._updateSliceProgress)
-        #self._editedGcode = None
-        #self._editedGcodeFilename = None
+        self.skirtlessLayerHistogram = {}
+        self.skirtlessGcodeList = []
         ###
 
         t = time.time()
@@ -204,12 +201,18 @@ class printWindow(wx.Frame):
         self.machineLogButton = wx.Button(self.panel, -1, _("Error log"))
         self.progress = wx.Gauge(self.panel, -1)
 
+        ### OUR EDITS ###
+        self.skirtOkButton = wx.Button(self.panel, -1, _("Skirt OK"))
+        ###
         self.sizer.Add(self.connectButton, pos=(1, 1), flag=wx.EXPAND)
         #self.sizer.Add(self.loadButton, pos=(1,1), flag=wx.EXPAND)
         self.sizer.Add(self.printButton, pos=(2, 1), flag=wx.EXPAND)
         self.sizer.Add(self.pauseButton, pos=(3, 1), flag=wx.EXPAND)
         self.sizer.Add(self.cancelButton, pos=(4, 1), flag=wx.EXPAND)
         self.sizer.Add(self.machineLogButton, pos=(5, 1), flag=wx.EXPAND)
+        ### OUR EDITS ###
+        self.sizer.Add(self.skirtOkButton, pos=(6, 1), flag=wx.EXPAND)
+        ###
         self.sizer.Add(self.progress, pos=(7, 0), span=(1, 7), flag=wx.EXPAND)
 
         nb = wx.Notebook(self.panel)
@@ -355,6 +358,9 @@ class printWindow(wx.Frame):
         self.printButton.Bind(wx.EVT_BUTTON, self.OnPrint)
         self.pauseButton.Bind(wx.EVT_BUTTON, self.OnPause)
         self.cancelButton.Bind(wx.EVT_BUTTON, self.OnCancel)
+        ### OUR EDITS ###
+        self.skirtOkButton.Bind(wx.EVT_BUTTON, self.OnSkirtOk)
+        ###
         self.machineLogButton.Bind(wx.EVT_BUTTON, self.OnMachineLog)
 
         self.Bind(wx.EVT_BUTTON, lambda e: (self.temperatureSelect.SetValue(int(profile.getProfileSettingFloat('print_temperature'))), self.machineCom.sendCommand("M104 S%d" % (int(profile.getProfileSettingFloat('print_temperature'))))), self.temperatureHeatUp)
@@ -470,6 +476,10 @@ class printWindow(wx.Frame):
             self.pauseButton.SetLabel(_("Pause"))
         self.cancelButton.Enable(
             self.machineCom is not None and (self.machineCom.isPrinting() or self.machineCom.isPaused()))
+        ### OUR EDITS ###
+        self.skirtOkButton.Enable(
+            self.machineCom is not None and self.machineCom.isPrinting())
+        ###
         self.temperatureSelect.Enable(self.machineCom is not None and self.machineCom.isOperational())
         self.bedTemperatureSelect.Enable(self.machineCom is not None and self.machineCom.isOperational())
         self.directControlPanel.Enable(
@@ -560,6 +570,22 @@ class printWindow(wx.Frame):
         self.machineCom.sendCommand("M104 S0")
         self.UpdateButtonStates()
 
+    ### OUR EDITS ###
+    def OnSkirtOk(self, e):
+        print "OnSkirtOk called"
+
+        print "Saving file with histograms"
+        with open("/Users/JamesHennessey/Projects/Cura/print_info/skirtlessGcode" + str(time.time()) + ".txt", 'w') as f:
+            for s in self.skirtlessGcodeList:
+                f.write(str(s) + '\n')
+        with open("/Users/JamesHennessey/Projects/Cura/print_info/skirtlessHist" + str(time.time()) + ".txt", 'w') as f:
+            for k,v in self.skirtlessLayerHistogram.iteritems():
+                f.write(str(k) + ': ' + str(v) + '\n')
+
+        print "In OnShirtOk, length of skirtlessGcodeList is " + str(len(self.skirtlessGcodeList))
+        self.machineCom.switchGCode(self.skirtlessGcodeList, self.skirtlessLayerHistogram)
+    ###
+
     def OnPause(self, e):
         if self.machineCom.isPaused():
             self.machineCom.setPause(False)
@@ -647,6 +673,10 @@ class printWindow(wx.Frame):
         layerIndex = 0
         self.layerHistogram[layerIndex] = 1
 
+        self.skirtlessLayerHistogram = {}
+        skirtlessLayerIndex = 0
+        seenEndOfSkirt = False
+        skirtlessGcodeList = []
         ###
 
         #Send an initial M110 to reset the line counter to zero.
@@ -658,7 +688,42 @@ class printWindow(wx.Frame):
             if line.startswith(';LAYER:'):
                 layerIndex += 1
                 self.layerHistogram[layerIndex] = 0
-            
+                if seenEndOfSkirt:
+                    skirtlessLayerIndex += 1
+                    self.skirtlessLayerHistogram[skirtlessLayerIndex] = 0
+           
+            #print "At line " + str(len(gcodeList)) + ", seen end of skirt is " + str(seenEndOfSkirt)
+            if line.startswith(';TYPE:WALL-INNER') and not seenEndOfSkirt:
+                print "Seen a type wall inner and not seen end of skirt"
+
+                # Find last E value in original file
+                e_regex = r'E([0-9\.]+)'
+                foundE = False
+                oldLineIndex = len(gcodeList) - 3
+                lineWithE = ''
+                while (oldLineIndex >= 0 and not foundE):
+                    oldLine = gcodeList[oldLineIndex]
+                    oldE = 0
+                    e_match = re.match('.*' + e_regex, oldLine)
+
+                    if e_match is not None:
+                        oldE = float(e_match.group(1))
+                        foundE = True
+                        lineWithE = oldLine
+
+                    oldLineIndex -= 1
+
+                if foundE:
+                    skirtlessGcodeList.append(lineWithE)
+                #line = oldLine.replace('E' + str(e_amount), 'E' + str(oldE))
+
+                # Find first WALL-INNER instructions for transitioning from skirt
+                skirtlessGcodeList.append(gcodeList[len(gcodeList)-2])
+                skirtlessGcodeList.append(gcodeList[len(gcodeList)-1])
+                self.skirtlessLayerHistogram[skirtlessLayerIndex] = 3
+                skirtlessLayerIndex += 1
+                self.skirtlessLayerHistogram[skirtlessLayerIndex] = 0
+                seenEndOfSkirt = True
             ###
 
             if line.startswith(';TYPE:'):
@@ -671,13 +736,20 @@ class printWindow(wx.Frame):
                 ### OUR EDITS
                 
                 self.layerHistogram[layerIndex] += 1
+                if seenEndOfSkirt:
+                    self.skirtlessLayerHistogram[skirtlessLayerIndex] += 1
                 
                 ###
 
                 if prevLineType != lineType:
                     gcodeList.append((line, lineType, ))
+                    if seenEndOfSkirt:
+                        skirtlessGcodeList.append((line, lineType, ))
                 else:
                     gcodeList.append(line)
+                    if seenEndOfSkirt:
+                        skirtlessGcodeList.append(line)
+
                 prevLineType = lineType
         gcode = gcodeInterpreter.gcode()
         gcode.loadList(gcodeList)
@@ -685,8 +757,10 @@ class printWindow(wx.Frame):
         self.filename = filename
         self.gcode = gcode
         self.gcodeList = gcodeList
+        self.skirtlessGcodeList = skirtlessGcodeList
 
         print "Gcode List len: " + str(len(self.gcodeList))
+        print "Skirtless List len: " + str(len(self.skirtlessGcodeList))
 
         wx.CallAfter(self.progress.SetRange, len(gcodeList))
         wx.CallAfter(self.UpdateButtonStates)
