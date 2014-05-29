@@ -673,10 +673,13 @@ class printWindow(wx.Frame):
         layerIndex = 0
         self.layerHistogram[layerIndex] = 1
 
-        self.skirtlessLayerHistogram = {}
+        self.skirtlessLayerHistogram = {0: 0}
         skirtlessLayerIndex = 0
         seenEndOfSkirt = False
         skirtlessGcodeList = []
+
+        insideSkirt = False
+        skirtLayerCount = 0
         ###
 
         #Send an initial M110 to reset the line counter to zero.
@@ -684,14 +687,14 @@ class printWindow(wx.Frame):
         for line in open(filename, 'r'):
 
             ### OUR EDITS
-        
+
             if line.startswith(';LAYER:'):
                 layerIndex += 1
                 self.layerHistogram[layerIndex] = 0
                 if seenEndOfSkirt:
                     skirtlessLayerIndex += 1
                     self.skirtlessLayerHistogram[skirtlessLayerIndex] = 0
-           
+            
             #print "At line " + str(len(gcodeList)) + ", seen end of skirt is " + str(seenEndOfSkirt)
             if line.startswith(';TYPE:WALL-INNER') and not seenEndOfSkirt:
                 print "Seen a type wall inner and not seen end of skirt"
@@ -727,6 +730,7 @@ class printWindow(wx.Frame):
             ###
 
             if line.startswith(';TYPE:'):
+                insideSkirt = line.startswith(';TYPE:SKIRT')
                 lineType = line[6:].strip()
             if ';' in line:
                 line = line[0:line.find(';')]
@@ -739,6 +743,19 @@ class printWindow(wx.Frame):
                 if seenEndOfSkirt:
                     self.skirtlessLayerHistogram[skirtlessLayerIndex] += 1
                 
+                if insideSkirt:
+                    print "We're inside SKIRT, skirtLayerCount: " + str(skirtLayerCount) + ", layerIndex: " + str(layerIndex) + \
+                            ", seenEndOfSkirt: " + str(seenEndOfSkirt) + ", skirtlessLayerIndex: " + str(skirtlessLayerIndex)
+                    # If we are in the skirt Gcode, split each chunk of five lines into a new layer
+                    # artificially by incrementing the layer index and adding new histogram rows
+                    skirtLayerCount += 1
+                    if skirtLayerCount == 1:
+                        layerIndex += 1
+                        self.layerHistogram[layerIndex] = 0
+                        skirtlessLayerIndex += 1
+                        self.skirtlessLayerHistogram[skirtlessLayerIndex] = 0
+                        skirtLayerCount = 0
+            
                 ###
 
                 if prevLineType != lineType:

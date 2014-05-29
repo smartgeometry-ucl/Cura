@@ -179,6 +179,7 @@ class MachineCom(object):
         self._currentGcodeFile = 0
         self._runningE = 0
         self._previousE = 0
+        self._newLayerThreshold = 4
 
         ###
 
@@ -460,7 +461,7 @@ class MachineCom(object):
                     #Test is command list is complate (+1 as pos starts at zero!)
                     if len(self._commandList) != (self._commandPos + 1):
                         #print "Commands in list: " + str(len(self._commandList) - self._commandPos)
-                        if (len(self._commandList) - self._commandPos) < 6 \
+                        if (len(self._commandList) - self._commandPos) < self._newLayerThreshold \
                                 and self._layerIndex in self._cumulLayerHistogram:
                             print "Sending layer sent to command list: " + str(self._layerIndex)
                             self._printDetails.append(";LAYER:%d F%d" % (self._layerIndex, self._currentGcodeFile))
