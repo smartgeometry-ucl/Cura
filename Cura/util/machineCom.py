@@ -457,9 +457,15 @@ class MachineCom(object):
                     timeout = time.time() + 5
 
 
+                    
+                    print "Gcode List Len " + str(len(self._gcodeList))
+                    print "Command List Len " + str(len(self._commandList))
+                    print "Gcode Pos " + str(self._gcodePos)
+                    print "Command Pos " + str(self._commandPos)
                     ### OUR EDITS
                     #Test is command list is complate (+1 as pos starts at zero!)
                     if len(self._commandList) != (self._commandPos + 1):
+                        print "len(self._commandList) != (self._commandPos + 1)"
                         #print "Commands in list: " + str(len(self._commandList) - self._commandPos)
                         if (len(self._commandList) - self._commandPos) < self._newLayerThreshold \
                                 and self._layerIndex in self._cumulLayerHistogram:
@@ -474,21 +480,24 @@ class MachineCom(object):
                         cmd = self._commandList[self._commandPos]
                         self._sendCommand(cmd)
                         self._commandPos += 1
-                    elif len(self._gcodeList) <= len(self._commandList):
-                        print "Command List bigger than gcode list set to operational"
-                        self._changeState(self.STATE_OPERATIONAL)
-                        self._writePrintDetails();
+                    
+                    #Commented out as it was stopping the print from finishing
+                    #elif len(self._gcodeList) <= len(self._commandList):
+                        #print "Command List bigger than gcode list set to operational"
+                        #self._changeState(self.STATE_OPERATIONAL)
+                        #self._writePrintDetails();
 
-                    elif len(self._gcodeList) != len(self._commandList):
-                        diff = len(self._gcodeList) - len(self._commandList)
-                        for i in xrange(diff):
-                            self._sendNext()
+                    #elif len(self._gcodeList) != len(self._commandList):
+                        #print "Empty Command List"
+                        #diff = len(self._gcodeList) - len(self._commandList)
+                        #for i in xrange(diff):
+                            #self._sendNext()
 
                     else:
                         print "Command List Empty set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
-                        for cmd in self._commandList:
-                            print cmd
+                        print self._commandList
+                        print self._gcodeList
 
                 elif "resend" in line.lower() or "rs" in line:
                     try:
@@ -761,6 +770,7 @@ class MachineCom(object):
         self._layerHistogram = layerHistogram
         self._cumulLayerHistogram = self._cumulDict(layerHistogram)
 
+        print gcodeList
         print self._layerHistogram
         print self._cumulLayerHistogram
 
@@ -769,10 +779,12 @@ class MachineCom(object):
 
         line_range = range(self._gcodePos)
         line_range.reverse()
+        print "Before Loop self._gcodePos " + str(self._gcodePos)
+        print line_range
         for i in line_range:
             
             line = self._gcodeList[i]
-
+            print "#### line " + line
             if 'E' in line:
                 e_regex = r'E([0-9\.]+)'
                 e_amount = 0
@@ -786,6 +798,20 @@ class MachineCom(object):
                     return
 
         print 'No E found'
+        for i in range(len(self._gcodeList)):
+            line = self._gcodeList[i]
+            print "#### line " + line
+            if 'E' in line:
+                e_regex = r'E([0-9\.]+)'
+                e_amount = 0
+
+                e_match = re.match('.*' + e_regex, line)
+
+                if e_match is not None:
+                    e_amount = float(e_match.group(1))
+                    self._previousE = e_amount - 3.0
+                    print "###### previousE " + str(self._previousE) + " e_amount " + str(e_amount)
+                    return
 
         ###
 

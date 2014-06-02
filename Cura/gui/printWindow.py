@@ -719,24 +719,30 @@ class printWindow(wx.Frame):
                     oldLineIndex -= 1
 
                 if foundE:
+                    print "LINE WITH E " + lineWithE
                     skirtlessGcodeList.append(lineWithE)
                 #line = oldLine.replace('E' + str(e_amount), 'E' + str(oldE))
 
-                gcodeList.append('M104 T0 S'+str(originalTemp) + ".00000")
+                gcodeList.append('M104 T0 S'+ str(originalTemp) + ".00000")
 
                 # Find first WALL-INNER instructions for transitioning from skirt
-                skirtlessGcodeList.append('M104 T0 S'+str(originalTemp) + ".00000")
                 skirtlessGcodeList.append(gcodeList[len(gcodeList)-2])
                 skirtlessGcodeList.append(gcodeList[len(gcodeList)-1])
                 self.skirtlessLayerHistogram[skirtlessLayerIndex] = 4
                 skirtlessLayerIndex += 1
                 self.skirtlessLayerHistogram[skirtlessLayerIndex] = 0
                 seenEndOfSkirt = True
+                print "skirtlessGcodeList ***"
+                print skirtlessGcodeList
             ###
 
             if line.startswith(';TYPE:'):
                 insideSkirt = line.startswith(';TYPE:SKIRT')
                 lineType = line[6:].strip()
+                #gcodeList.append('G92 E0')
+                #gcodeList.append('G1 E5 F120')
+                #gcodeList.append('G92 E0')
+                #self.layerHistogram[layerIndex] += 3
             if ';' in line:
                 line = line[0:line.find(';')]
             line = line.strip()
@@ -746,13 +752,12 @@ class printWindow(wx.Frame):
                 if originalTemp is None:
                     if 'M109' in line and 'S' in line:
                         originalTemp = int(re.search('S([0-9]*)', line).group(1))
-                        line = re.sub('S([0-9]*)', 'S260', line)
-
+                        line = re.sub('S([0-9]*)', 'S250', line)
 
                 self.layerHistogram[layerIndex] += 1
                 if seenEndOfSkirt:
                     self.skirtlessLayerHistogram[skirtlessLayerIndex] += 1
-                
+
                 if insideSkirt:
                     print "We're inside SKIRT, skirtLayerCount: " + str(skirtLayerCount) + ", layerIndex: " + str(layerIndex) + \
                             ", seenEndOfSkirt: " + str(seenEndOfSkirt) + ", skirtlessLayerIndex: " + str(skirtlessLayerIndex)
@@ -765,7 +770,6 @@ class printWindow(wx.Frame):
                         skirtlessLayerIndex += 1
                         self.skirtlessLayerHistogram[skirtlessLayerIndex] = 0
                         skirtLayerCount = 0
-            
                 ###
 
                 if prevLineType != lineType:
@@ -776,6 +780,10 @@ class printWindow(wx.Frame):
                     gcodeList.append(line)
                     if seenEndOfSkirt:
                         skirtlessGcodeList.append(line)
+
+                    if 'M109' in line and 'S250' in line:
+                          gcodeList.append('M104 T0 S'+str(originalTemp) + ".00000")
+                          self.layerHistogram[layerIndex] += 1
 
                 prevLineType = lineType
         gcode = gcodeInterpreter.gcode()
