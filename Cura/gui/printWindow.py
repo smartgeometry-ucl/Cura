@@ -23,6 +23,7 @@ from Cura.util import profile
 
 ###### OUR EDITS #########
 import shutil
+import math
 #from Cura.util import meshLoader
 #from Cura.util import sliceEngine
 #from Cura.util import objectScene
@@ -145,6 +146,8 @@ class printWindow(wx.Frame):
         self.layerHistogram = {}
         self.skirtlessLayerHistogram = {}
         self.skirtlessGcodeList = []
+        self.skirtOKBtnActive = 0
+        self.skirtOKBtnPressed = False
         ###
 
         t = time.time()
@@ -462,6 +465,7 @@ class printWindow(wx.Frame):
         self.cam.openPropertyPage(e.GetEventObject().index)
 
     def UpdateButtonStates(self):
+        print "Updated Buttons"
         self.connectButton.Enable(self.machineCom is None or self.machineCom.isClosedOrError())
         #self.loadButton.Enable(self.machineCom == None or not (self.machineCom.isPrinting() or self.machineCom.isPaused()))
         self.printButton.Enable(self.machineCom is not None and self.machineCom.isOperational() and not (
@@ -477,8 +481,11 @@ class printWindow(wx.Frame):
         self.cancelButton.Enable(
             self.machineCom is not None and (self.machineCom.isPrinting() or self.machineCom.isPaused()))
         ### OUR EDITS ###
-        self.skirtOkButton.Enable(
-            self.machineCom is not None and self.machineCom.isPrinting())
+        print "self.skirtOKBtnActive > 1  " + str((self.skirtOKBtnActive > 1) )
+        print "self.skirtOKBtnPressed  " + str(self.skirtOKBtnPressed)
+        print "self.machineCom is not None and self.machineCom.isPrinting()   " + str(self.machineCom is not None and self.machineCom.isPrinting())
+        self.skirtOkButton.Enable((self.skirtOKBtnActive > 1) and not self.skirtOKBtnPressed and \
+                (self.machineCom is not None and self.machineCom.isPrinting()))
         ###
         self.temperatureSelect.Enable(self.machineCom is not None and self.machineCom.isOperational())
         self.bedTemperatureSelect.Enable(self.machineCom is not None and self.machineCom.isOperational())
@@ -573,7 +580,7 @@ class printWindow(wx.Frame):
     ### OUR EDITS ###
     def OnSkirtOk(self, e):
         print "OnSkirtOk called"
-
+        self.skirtOKBtnPressed = True
         print "Saving file with histograms"
         with open("/Users/JamesHennessey/Projects/Cura/print_info/skirtlessGcode" + str(time.time()) + ".txt", 'w') as f:
             for s in self.skirtlessGcodeList:
@@ -584,6 +591,7 @@ class printWindow(wx.Frame):
 
         print "In OnShirtOk, length of skirtlessGcodeList is " + str(len(self.skirtlessGcodeList))
         self.machineCom.switchGCode(self.skirtlessGcodeList, self.skirtlessLayerHistogram)
+        self.UpdateButtonStates()
     ###
 
     def OnPause(self, e):
@@ -782,6 +790,10 @@ class printWindow(wx.Frame):
                     gcodeList.append(line)
                     if seenEndOfSkirt:
                         skirtlessGcodeList.append(line)
+                    #if insideSkirt:
+                        #for i in range(100):
+                            #gcodeList.append("G0")
+                        #self.layerHistogram[layerIndex] += 100
 
                     if 'M109' in line and 'S250' in line:
                           gcodeList.append('M104 T0 S'+str(originalTemp) + ".00000")
@@ -826,8 +838,16 @@ class printWindow(wx.Frame):
         pass
 
     def mcTempUpdate(self, temp, bedTemp, targetTemp, bedTargetTemp):
+        print "Temp " + str(temp)
+        print "TargetTemp " + str(targetTemp)
+        print "Diff " + str(math.sqrt((temp[0] - targetTemp[0])**2))
+        if math.sqrt((temp[0] - targetTemp[0])**2) < 5 and temp[0] < 240.00 and temp[0] > 190.0:
+            print "self.skirtOKBtnActive += 1"
+            self.skirtOKBtnActive += 1
+
         self.temperatureGraph.addPoint(temp, targetTemp, bedTemp, bedTargetTemp)
         wx.CallAfter(self._mcTempUpdate, temp, bedTemp, targetTemp, bedTargetTemp)
+        self.UpdateButtonStates()
 
     def _mcTempUpdate(self, temp, bedTemp, targetTemp, bedTargetTemp):
         if self.temperatureSelect.GetValue() != targetTemp[0] and wx.Window.FindFocus() != self.temperatureSelect:

@@ -498,8 +498,8 @@ class MachineCom(object):
                     else:
                         print "Command List Empty set to operational"
                         self._changeState(self.STATE_OPERATIONAL)
-                        print self._commandList
-                        print self._gcodeList
+                        #print self._commandList
+                        #print self._gcodeList
 
                 elif "resend" in line.lower() or "rs" in line:
                     try:
@@ -772,7 +772,7 @@ class MachineCom(object):
         self._layerHistogram = layerHistogram
         self._cumulLayerHistogram = self._cumulDict(layerHistogram)
 
-        print gcodeList
+        #print gcodeList
         print self._layerHistogram
         print self._cumulLayerHistogram
 
