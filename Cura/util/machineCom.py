@@ -476,16 +476,18 @@ class MachineCom(object):
                             #### TEST BUFFER WORKS #####
                             #self._transformFutureLayers()
                             self._layerIndex += 1
+                        else:
+                            print "Commands Left " + str(len(self._commandList) - self._commandPos)
+                            print "Next Layer Index " + str(self._layerIndex)
+                            print "Next Layer Index In Hist " + str(self._layerIndex in self._cumulLayerHistogram)
+
 
                         cmd = self._commandList[self._commandPos]
                         self._sendCommand(cmd)
                         self._commandPos += 1
                     
-                    #Commented out as it was stopping the print from finishing
-                    #elif len(self._gcodeList) <= len(self._commandList):
-                        #print "Command List bigger than gcode list set to operational"
-                        #self._changeState(self.STATE_OPERATIONAL)
-                        #self._writePrintDetails();
+                    #Commented out as now have changed how gcode lists are made and histograms are accurate
+                    #leaving incase it needs to be put back in.
 
                     #elif len(self._gcodeList) != len(self._commandList):
                         #print "Empty Command List"
@@ -777,12 +779,14 @@ class MachineCom(object):
         self._gcodePos = self._cumulLayerHistogram[self._layerIndex - 1] - 1
         self._currentGcodeFile += 1
 
+        if self._gcodePos == -1:
+            self._gcodePos = 0
+
         line_range = range(self._gcodePos)
         line_range.reverse()
         print "Before Loop self._gcodePos " + str(self._gcodePos)
         print line_range
         for i in line_range:
-            
             line = self._gcodeList[i]
             print "#### line " + line
             if 'E' in line:

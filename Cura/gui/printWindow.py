@@ -768,7 +768,9 @@ class printWindow(wx.Frame):
                         layerIndex += 1
                         self.layerHistogram[layerIndex] = 0
                         skirtlessLayerIndex += 1
-                        self.skirtlessLayerHistogram[skirtlessLayerIndex] = 0
+                        #SKIRTLESS GCODE CANNOT HAVE EMPTY LAYERS
+                        skirtlessGcodeList.append("M114")
+                        self.skirtlessLayerHistogram[skirtlessLayerIndex] = 1
                         skirtLayerCount = 0
                 ###
 
