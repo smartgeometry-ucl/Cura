@@ -119,6 +119,11 @@ class SceneView(openglGui.glGuiPanel):
         ###### OUR EDITS #####
         self.reSendButton         = openglGui.glButton(self, 5, _("Re-Send"), (3,0), self.OnRePrintButton)
         self.reSendButton.setDisabled(True)
+
+        self.noiseButton         = openglGui.glButton(self, 5, _("Noise"), (4,0), self.OnNoiseButton)
+        self.noiseButton.setDisabled(False)
+
+
         #####################
 
         self.OnViewChange()
@@ -258,7 +263,6 @@ class SceneView(openglGui.glGuiPanel):
             self.PopupMenu(menu)
             menu.Destroy()
 
-    
     ############ OUR EDITS ################
     def OnRePrintButton(self, button):
         if button == 1:
@@ -268,6 +272,19 @@ class SceneView(openglGui.glGuiPanel):
                 return
             self._usbPrintMonitor.loadFile(self._gcodeFilename, self._slicer.getID())
 
+
+
+    def OnNoiseButton(self, button):
+        if button == 1:
+            print "OnNoiseButton"
+            for n in xrange(0, len(self._scene.objects())):
+                obj = self._scene.objects()[n]
+                for m in obj._meshList:
+                    m.addNoise()
+                    m.vbo.release()
+                    m.vbo = None
+
+            self.sceneUpdated()
 
     ######################################
 
@@ -1212,12 +1229,15 @@ void main(void)
         glMultMatrixf(tempMatrix)
 
         n = 0
+        print obj._originFilename
         for m in obj._meshList:
             if m.vbo is None:
                 m.vbo = opengl.GLVBO(m.vertexes, m.normal)
             if brightness:
                 glColor4fv(map(lambda n: n * brightness, self._objColors[n]))
                 n += 1
+            print "m.vertexes"
+            print m.vertexes
             m.vbo.render()
         glPopMatrix()
 
