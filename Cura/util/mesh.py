@@ -7,6 +7,7 @@ import os
 import random
 import numpy
 import struct
+import subprocess
 
 #import meshLoader
 
@@ -287,7 +288,8 @@ class mesh(object):
     def simplifyMesh(self):
         print "Simplify Mesh"
 
-        f = open("/Users/JamesHennessey/Projects/Cura/print_info/input.stl", 'w')
+        inputFile = "/Users/JamesHennessey/Projects/Cura/print_info/input.stl"
+        f = open(inputFile, 'w')
         f.write(("CURA BINARY STL EXPORT. " + time.strftime('%a %d %b %Y %H:%M:%S')).ljust(80, '\000'))
 
         vertexCount = self.vertexCount
@@ -310,7 +312,13 @@ class mesh(object):
         self.vertexCount = 0
         self.vbo = None
 
-        f = open("/Users/JamesHennessey/Projects/Cura/print_info/output.stl", "r")
+        args = ("/Users/JamesHennessey/Projects/laplace_beltrami/laplace_beltrami", inputFile)
+        popen = subprocess.Popen(args, stdout=subprocess.PIPE)
+        popen.wait()
+        output = popen.stdout.read()
+        print "Output STL: " + output
+
+        f = open(output, "r")
         if f.read(5).lower() == "solid":
             self._loadAscii(f)
             if vertexCount < 3:
