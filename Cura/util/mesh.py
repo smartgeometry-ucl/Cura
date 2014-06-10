@@ -6,6 +6,10 @@ import math
 import os
 import random
 import numpy
+import struct
+
+#import meshLoader
+
 numpy.seterr(all='ignore')
 
 class printableObject(object):
@@ -252,18 +256,70 @@ class mesh(object):
 
     ####### OUR EDITS ################
 
-    def addNoise(self):
-        print "Add Noise"
-        #if self.vbo is not None:
-            #self.vbo.release()
-        print self.vertexes
-        for i in xrange(len(self.vertexes)):
-            #print v
-            r = random.random()
-            #print r
-            self.vertexes[i] = self.vertexes[i] * r
-        print self.vertexes
-        self._calculateNormals()
+    def _loadAscii(self, f):
+        cnt = 0
+        for lines in f:
+            for line in lines.split('\r'):
+                if 'vertex' in line:
+                    cnt += 1
+        self._prepareFaceCount(int(cnt) / 3)
+        f.seek(5, os.SEEK_SET)
+        cnt = 0
+        data = [None,None,None]
+        for lines in f:
+            for line in lines.split('\r'):
+                if 'vertex' in line:
+                    data[cnt] = line.split()[1:]
+                    cnt += 1
+                    if cnt == 3:
+                        self._addFace(float(data[0][0]), float(data[0][1]), float(data[0][2]), float(data[1][0]), float(data[1][1]), float(data[1][2]), float(data[2][0]), float(data[2][1]), float(data[2][2]))
+                        cnt = 0
+
+    def _loadBinary(self, f):
+        #Skip the header
+        f.read(80-5)
+        faceCount = struct.unpack('<I', f.read(4))[0]
+        self._prepareFaceCount(faceCount)
+        for idx in xrange(0, faceCount):
+            data = struct.unpack("<ffffffffffffH", f.read(50))
+            self._addFace(data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11])
+
+    def simplifyMesh(self):
+        print "Simplify Mesh"
+
+        f = open("/Users/JamesHennessey/Projects/Cura/print_info/input.stl", 'w')
+        f.write(("CURA BINARY STL EXPORT. " + time.strftime('%a %d %b %Y %H:%M:%S')).ljust(80, '\000'))
+
+        vertexCount = self.vertexCount
+
+        #Next follow 4 binary bytes containing the amount of faces, and then the face information.
+        f.write(struct.pack("<I", int(vertexCount / 3)))
+        vertexes = self.getTransformedVertexes(True)
+        for idx in xrange(0, vertexCount, 3):
+            v1 = vertexes[idx]
+            v2 = vertexes[idx+1]
+            v3 = vertexes[idx+2]
+            f.write(struct.pack("<fff", 0.0, 0.0, 0.0))
+            f.write(struct.pack("<fff", v1[0], v1[1], v1[2]))
+            f.write(struct.pack("<fff", v2[0], v2[1], v2[2]))
+            f.write(struct.pack("<fff", v3[0], v3[1], v3[2]))
+            f.write(struct.pack("<H", 0))
+        f.close()
+
+        self.vertexes = []
+        self.vertexCount = 0
+        self.vbo = None
+
+        f = open("/Users/JamesHennessey/Projects/Cura/print_info/output.stl", "r")
+        if f.read(5).lower() == "solid":
+            self._loadAscii(f)
+            if vertexCount < 3:
+                f.seek(5, os.SEEK_SET)
+                self._loadBinary(f)
+        else:
+            self._loadBinary(f)
+        f.close()
+        self._obj._postProcessAfterLoad()
 
     ##################################
     def _addFace(self, x0, y0, z0, x1, y1, z1, x2, y2, z2):

@@ -120,9 +120,8 @@ class SceneView(openglGui.glGuiPanel):
         self.reSendButton         = openglGui.glButton(self, 5, _("Re-Send"), (3,0), self.OnRePrintButton)
         self.reSendButton.setDisabled(True)
 
-        self.noiseButton         = openglGui.glButton(self, 5, _("Noise"), (4,0), self.OnNoiseButton)
-        self.noiseButton.setDisabled(False)
-
+        self.simplifyButton         = openglGui.glButton(self, 5, _("Simplify"), (4,0), self.OnSimplifyButton)
+        self.simplifyButton.setDisabled(False)
 
         #####################
 
@@ -274,15 +273,14 @@ class SceneView(openglGui.glGuiPanel):
 
 
 
-    def OnNoiseButton(self, button):
+    def OnSimplifyButton(self, button):
         if button == 1:
-            print "OnNoiseButton"
+            print "OnSimplifyButton"
             for n in xrange(0, len(self._scene.objects())):
                 obj = self._scene.objects()[n]
                 for m in obj._meshList:
-                    m.addNoise()
                     m.vbo.release()
-                    m.vbo = None
+                    m.simplifyMesh()
 
             self.sceneUpdated()
 
@@ -1229,15 +1227,15 @@ void main(void)
         glMultMatrixf(tempMatrix)
 
         n = 0
-        print obj._originFilename
+        #print obj._originFilename
         for m in obj._meshList:
             if m.vbo is None:
                 m.vbo = opengl.GLVBO(m.vertexes, m.normal)
             if brightness:
                 glColor4fv(map(lambda n: n * brightness, self._objColors[n]))
                 n += 1
-            print "m.vertexes"
-            print m.vertexes
+            #print "m.vertexes"
+            #print m.vertexes
             m.vbo.render()
         glPopMatrix()
 
