@@ -590,7 +590,7 @@ class printWindow(wx.Frame):
                 f.write(str(k) + ': ' + str(v) + '\n')
 
         print "In OnShirtOk, length of skirtlessGcodeList is " + str(len(self.skirtlessGcodeList))
-        self.machineCom.switchGCode(self.skirtlessGcodeList, self.skirtlessLayerHistogram)
+        self.machineCom.switchGCode(self.skirtlessGcodeList, self.skirtlessLayerHistogram, True)
         self.UpdateButtonStates()
     ###
 
@@ -690,6 +690,7 @@ class printWindow(wx.Frame):
 
         insideSkirt = False
         skirtLayerCount = 0
+        layerCount = 0
         ###
 
         #Send an initial M110 to reset the line counter to zero.
@@ -697,6 +698,8 @@ class printWindow(wx.Frame):
         for line in open(filename, 'r'):
 
             ### OUR EDITS
+            if line.startswith(';Layer count:'):
+                layerCount = int(line[15:])
 
             if line.startswith(';LAYER:'):
                 layerIndex += 1
@@ -772,12 +775,12 @@ class printWindow(wx.Frame):
                     # If we are in the skirt Gcode, split each chunk of five lines into a new layer
                     # artificially by incrementing the layer index and adding new histogram rows
                     skirtLayerCount += 1
-                    if skirtLayerCount == 1:
+                    if skirtLayerCount == (layerCount / 50):
                         layerIndex += 1
                         self.layerHistogram[layerIndex] = 0
                         skirtlessLayerIndex += 1
                         #SKIRTLESS GCODE CANNOT HAVE EMPTY LAYERS
-                        skirtlessGcodeList.append("M114")
+                        skirtlessGcodeList.append("M808")
                         self.skirtlessLayerHistogram[skirtlessLayerIndex] = 1
                         skirtLayerCount = 0
                 ###

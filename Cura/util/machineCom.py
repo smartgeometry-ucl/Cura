@@ -483,8 +483,9 @@ class MachineCom(object):
 
 
                         cmd = self._commandList[self._commandPos]
-                        self._sendCommand(cmd)
-                        self._commandPos += 1
+                        if cmd is not 'M808':
+                            self._sendCommand(cmd)
+                            self._commandPos += 1
                     
                     #Commented out as now have changed how gcode lists are made and histograms are accurate
                     #leaving incase it needs to be put back in.
@@ -766,7 +767,7 @@ class MachineCom(object):
 
         self._layerIndex += 1
 
-    def switchGCode(self, gcodeList, layerHistogram):
+    def switchGCode(self, gcodeList, layerHistogram, skirtSwitch = False):
         print "Switch GCode called at layer " + str(self._layerIndex)
         self._gcodeList = gcodeList
         self._layerHistogram = layerHistogram
@@ -782,6 +783,29 @@ class MachineCom(object):
         if self._gcodePos == -1:
             self._gcodePos = 0
 
+
+        #if skirtSwitch:
+            #print "skirtSwitch"
+            #self._sendCommand(self._gcodeList[0])
+            #self._gcodePos+=1
+            #foundFirstLayer = False
+            #layerIndexOrig = self._layerIndex
+            #gcodePosOrig = self._gcodePos
+            #while(not foundFirstLayer):
+                #if self._layerIndex in self._cumulLayerHistogram:
+                    #print "Test Next Layer"
+                    #for i in range(self._cumulLayerHistogram[self._layerIndex]):
+                        #if self._gcodeList[self._gcodePos] is not 'M808':
+                            #self.gcodePos -= i
+                            #foundFirstLayer = True
+                    #self._layerIndex += 1
+                #else:
+                    #print "Next Layer Not Found"
+                    #self._layerIndex = layerIndexOrig
+                    #self._gcodePos = gcodePosOrig
+
+
+        print "GCODE POS AT SWTICH: " + str(self._gcodePos)
         line_range = range(self._gcodePos)
         line_range.reverse()
         print "Before Loop self._gcodePos " + str(self._gcodePos)
