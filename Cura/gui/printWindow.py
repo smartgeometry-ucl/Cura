@@ -775,7 +775,7 @@ class printWindow(wx.Frame):
                     # If we are in the skirt Gcode, split each chunk of five lines into a new layer
                     # artificially by incrementing the layer index and adding new histogram rows
                     skirtLayerCount += 1
-                    if skirtLayerCount == (layerCount / 50):
+                    if skirtLayerCount == 1:#(layerCount / 50):
                         layerIndex += 1
                         self.layerHistogram[layerIndex] = 0
                         skirtlessLayerIndex += 1
