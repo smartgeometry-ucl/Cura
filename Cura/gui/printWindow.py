@@ -398,11 +398,12 @@ class printWindow(wx.Frame):
         while True:
             line = sys.stdin.readline().rstrip()
             if line.startswith('LOAD:'):
+                print "LOAD SEEN"
                 if not self.LoadGCodeFile(line[5:]):
                     print 'LOADFAILED\n'
                 elif self.machineCom.isPrinting():
                     print "LoadGCode Success, MachineCom is printing so switchingGcode at next layer"
-                    self.machineCom.switchGCode(self.gcodeList, self.layerHistogram)
+                    self.machineCom.switchGCode(self.gcodeList, self.layerHistogram, False)
 
     def _webcamCheck(self):
         self.cam = webcam.webcam()
