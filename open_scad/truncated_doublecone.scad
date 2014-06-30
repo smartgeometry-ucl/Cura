@@ -12,7 +12,7 @@ module trunccylinder() {
 	{
 		cylinder(h = cylinder_height/2, r1 = cylinder_width1, r2 = cylinder_width2);
 		translate([0,0,cylinder_height/2])
-					cylinder(h = cylinder_height/2, r1 = cylinder_width2, r2 = cylinder_width1);
+		cylinder(h = cylinder_height/2, r1 = cylinder_width2, r2 = cylinder_width1);
 
 	}
 }
