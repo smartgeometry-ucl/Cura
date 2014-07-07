@@ -3,9 +3,9 @@ $fn=200;
 
 use <calibration_square.scad>
 
-cylinder_width1=7;
-cylinder_width2=20;
-cylinder_height=20;
+cylinder_width1=25;
+cylinder_width2=50;
+cylinder_height=15;
 
 module trunccylinder() {
 	union()
@@ -17,7 +17,6 @@ module trunccylinder() {
 	}
 }
  
+trunccylinder();
 
-	trunccylinder();
-
-calibration_square();
+//calibration_square();
